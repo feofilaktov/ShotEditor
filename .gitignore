@@ -1,0 +1,19 @@
+# Build output
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj
+
+# Assembled app & distribution artifacts (attach to GitHub Releases instead)
+ShotEditor.app/
+dist/
+*.dmg
+
+# Generated at build time
+Resources/AppIcon.icns
+
+# Test artifacts
+.test-artifacts/
+
+# macOS
+.DS_Store
