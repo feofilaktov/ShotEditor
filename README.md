@@ -18,6 +18,16 @@ Annotate, redact, and beautify — then save, copy, or drag out:
 
 ![Annotation example](docs/showcase.png)
 
+## Contents
+
+- [Install](#install)
+- [Features](#features)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Build & run](#build--run)
+- [Development](#development)
+- [Tests](#tests)
+- [License](#license)
+
 ## Install
 
 1. Download `ShotEditor.dmg` from the [latest release](../../releases/latest).
@@ -182,12 +192,22 @@ English-only for now. Text fonts use widely-available system fonts.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
-## Building a release
+## Development
+
+Common tasks are wrapped in a `Makefile`:
 
 ```sh
-./scripts/make-dmg.sh        # universal .dmg → dist/ShotEditor.dmg
-./scripts/run-tests.sh       # unit + visual smoke tests
+make build     # debug build
+make run       # build + launch
+make test      # unit + visual smoke tests
+make release   # universal release build
+make dmg       # universal .dmg → dist/ShotEditor.dmg
+make cert      # one-time: stable self-signed identity (keeps Screen Recording granted)
+make help      # list all targets
 ```
+
+- Architecture & source map: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 

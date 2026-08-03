@@ -3,6 +3,10 @@
 All notable changes to ShotEditor are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+_Nothing yet._
+
 ## [0.1.0] — 2026-08-02
 
 First public release. A local-first macOS screenshot capture & annotation tool.
