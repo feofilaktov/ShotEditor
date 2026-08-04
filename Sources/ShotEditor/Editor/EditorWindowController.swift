@@ -114,6 +114,7 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
         canvas = CanvasView(document: doc)
         canvas.delegate = self
         scrollView = NSScrollView()
+        scrollView.contentView = CenteringClipView()   // center small images
         scrollView.documentView = canvas
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
@@ -359,7 +360,10 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
     private func addDashToggle() {
         let bar = IconSegmentedBar(items: [.symbol("minus"), .symbol("ellipsis")],
                                    selected: settings.dashed ? 1 : 0)
-        bar.onSelect = { [weak self] i in self?.settings.dashed = (i == 1) }
+        bar.onSelect = { [weak self] i in
+            self?.settings.dashed = (i == 1)
+            self?.canvas.applyToSelection { $0.dashed = (i == 1) }
+        }
         group("Line", bar)
     }
 
@@ -381,6 +385,7 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
         bar.onPick = { [weak self] c in
             self?.settings.color = c
             self?.canvas.commitTextEditingIfNeeded()
+            self?.canvas.applyToSelection { $0.color = c }
         }
         inspectorStack.addArrangedSubview(bar)
         inspectorStack.addArrangedSubview(vDivider())
@@ -390,26 +395,43 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
         let items: [IconSegmentedBar.Item] = [.dot(5), .dot(8), .dot(12), .dot(16)]
         let idx = ToolSettings.lineWidths.firstIndex(of: settings.lineWidth) ?? 1
         let bar = IconSegmentedBar(items: items, selected: idx)
-        bar.onSelect = { [weak self] i in self?.settings.lineWidth = ToolSettings.lineWidths[i] }
+        bar.onSelect = { [weak self] i in
+            let w = ToolSettings.lineWidths[i]
+            self?.settings.lineWidth = w
+            self?.canvas.applyToSelection { a in
+                a.lineWidth = (a as? PenAnnotation)?.isHighlighter == true ? max(14, w * 4) : w
+            }
+        }
         group("Size", bar)
     }
 
     private func addArrowStyle() {
         let items = ArrowStyle.allCases.map { IconSegmentedBar.Item.symbol($0.iconName) }
         let bar = IconSegmentedBar(items: items, selected: settings.arrowStyle.rawValue)
-        bar.onSelect = { [weak self] i in self?.settings.arrowStyle = ArrowStyle(rawValue: i) ?? .filled }
+        bar.onSelect = { [weak self] i in
+            let st = ArrowStyle(rawValue: i) ?? .filled
+            self?.settings.arrowStyle = st
+            self?.canvas.applyToSelection { ($0 as? ArrowAnnotation)?.style = st }
+        }
         group("Style", bar)
     }
 
     private func addShapeKind() {
         let items = ShapeKind.allCases.map { IconSegmentedBar.Item.symbol($0.iconName) }
         let bar = IconSegmentedBar(items: items, selected: settings.shapeKind.rawValue)
-        bar.onSelect = { [weak self] i in self?.settings.shapeKind = ShapeKind(rawValue: i) ?? .rect }
+        bar.onSelect = { [weak self] i in
+            let k = ShapeKind(rawValue: i) ?? .rect
+            self?.settings.shapeKind = k
+            self?.canvas.applyToSelection { ($0 as? ShapeAnnotation)?.kind = k }
+        }
         group("Shape", bar)
 
         let fill = IconSegmentedBar(items: [.symbol("square"), .symbol("square.fill")],
                                     selected: settings.shapeFilled ? 1 : 0)
-        fill.onSelect = { [weak self] i in self?.settings.shapeFilled = (i == 1) }
+        fill.onSelect = { [weak self] i in
+            self?.settings.shapeFilled = (i == 1)
+            self?.canvas.applyToSelection { ($0 as? ShapeAnnotation)?.filled = (i == 1) }
+        }
         group("Fill", fill)
     }
 
@@ -437,7 +459,10 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
 
         inspectorStack.addArrangedSubview(vDivider())
         let bg = SwatchBar(selected: settings.textBackground, includeTransparent: true)
-        bg.onPick = { [weak self] c in self?.settings.textBackground = c }
+        bg.onPick = { [weak self] c in
+            self?.settings.textBackground = c
+            self?.canvas.applyToSelection { ($0 as? TextAnnotation)?.backgroundColor = c }
+        }
         group("Background", bg)
     }
 
@@ -445,8 +470,10 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
         let items = BlurStyle.allCases.map { IconSegmentedBar.Item.symbol($0.symbolName) }
         let bar = IconSegmentedBar(items: items, selected: settings.blurStyle.rawValue)
         bar.onSelect = { [weak self] i in
-            self?.settings.blurStyle = BlurStyle(rawValue: i) ?? .pixelate
-            self?.blurAmountSlider?.isEnabled = (self?.settings.blurStyle != .solid)
+            let st = BlurStyle(rawValue: i) ?? .pixelate
+            self?.settings.blurStyle = st
+            self?.blurAmountSlider?.isEnabled = (st != .solid)
+            self?.canvas.applyToSelection { ($0 as? BlurAnnotation)?.style = st }
         }
         group("Effect", bar)
 
@@ -488,14 +515,27 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
     @objc private func fontChanged(_ s: NSPopUpButton) {
         settings.fontName = ToolSettings.availableFonts[s.indexOfSelectedItem].name
         canvas.commitTextEditingIfNeeded()
+        applyFontToSelection()
     }
     @objc private func fontSizeChanged(_ s: NSTextField) {
         settings.fontSize = CGFloat(s.integerValue); fontStepperControl?.integerValue = s.integerValue
+        applyFontToSelection()
     }
     @objc private func fontStepper(_ s: NSStepper) {
         settings.fontSize = CGFloat(s.integerValue); fontSizeField?.integerValue = s.integerValue
+        applyFontToSelection()
     }
-    @objc private func blurAmountChanged(_ s: NSSlider) { settings.blurAmount = CGFloat(s.doubleValue) }
+    private func applyFontToSelection() {
+        let f = settings.font
+        canvas.applyToSelection { a in
+            (a as? TextAnnotation)?.font = f
+            (a as? CalloutAnnotation)?.font = f
+        }
+    }
+    @objc private func blurAmountChanged(_ s: NSSlider) {
+        settings.blurAmount = CGFloat(s.doubleValue)
+        canvas.applyToSelection { ($0 as? BlurAnnotation)?.amount = CGFloat(s.doubleValue) }
+    }
 
     @objc private func applyCrop(_ s: Any?) { canvas.applyCrop() }
     @objc private func cancelCrop(_ s: Any?) {
@@ -613,11 +653,17 @@ final class EditorWindowController: NSWindowController, CanvasViewDelegate, NSWi
     private func centerAndSize() {
         guard let window, let screen = NSScreen.main else { return }
         let img = doc.imageSize
-        let chrome = Theme.toolbarHeight + Theme.inspectorHeight + Theme.statusHeight + 40
+        let chrome = Theme.toolbarHeight + Theme.inspectorHeight + Theme.statusHeight
+        let margin: CGFloat = 32
         let maxW = screen.visibleFrame.width * 0.9
-        let maxH = screen.visibleFrame.height * 0.9
-        let w = min(max(img.width + 40, 720), maxW)
-        let h = min(max(img.height + chrome, 480), maxH)
+        let maxH = screen.visibleFrame.height * 0.88
+
+        // Fit the image into the available area (never upscaling), then size the
+        // window to hug that fitted image so there's no big empty margin.
+        let availW = maxW - margin, availH = maxH - chrome - margin
+        let z = min(availW / img.width, availH / img.height, 1.0)
+        let w = min(maxW, max(760, img.width * z + margin))
+        let h = min(maxH, max(480, img.height * z + chrome + margin))
         window.setContentSize(CGSize(width: w, height: h))
         window.center()
         DispatchQueue.main.async { [weak self] in self?.fitZoom() }

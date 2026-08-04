@@ -444,6 +444,32 @@ final class CanvasView: NSView, NSTextViewDelegate {
     // MARK: Selection ops
 
     var hasSelection: Bool { selected != nil }
+    var selectedKind: ToolKind? {
+        switch selected {
+        case is ArrowAnnotation: return .arrow
+        case is ShapeAnnotation: return .shape
+        case let p as PenAnnotation: return p.isHighlighter ? .highlighter : .pen
+        case is NumberAnnotation: return .number
+        case is TextAnnotation: return .text
+        case is CalloutAnnotation: return .callout
+        case is BlurAnnotation: return .blur
+        default: return nil
+        }
+    }
+
+    /// Mutate the selected object (color/width/style/etc.) with undo + redraw.
+    /// Called by the inspector so editing an already-placed object works without
+    /// deleting and redrawing it.
+    @discardableResult
+    func applyToSelection(_ apply: (Annotation) -> Void) -> Bool {
+        guard let sel = selected else { return false }
+        let before = snapshotAnnotations()
+        apply(sel)
+        registerUndo(before)
+        notifyChange()
+        needsDisplay = true
+        return true
+    }
 
     func deleteSelection() {
         guard let sel = selected else { return }

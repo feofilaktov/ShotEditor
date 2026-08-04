@@ -533,8 +533,15 @@ final class BlurAnnotation: Annotation {
 
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
+    /// Fixed per-object random offset so the pixelation looks randomly corrupted
+    /// (not a clean uniform grid) yet stays stable across redraws/undo.
+    var seedX: CGFloat
+    var seedY: CGFloat
+
     init(rect: CGRect, style: BlurStyle) {
         self.rect = rect; self.style = style
+        self.seedX = CGFloat(arc4random_uniform(4000))
+        self.seedY = CGFloat(arc4random_uniform(4000))
     }
 
     override var bounds: CGRect { rect }
@@ -555,6 +562,7 @@ final class BlurAnnotation: Annotation {
     override func clone() -> Annotation {
         let b = BlurAnnotation(rect: rect, style: style)
         b.amount = amount
+        b.seedX = seedX; b.seedY = seedY   // keep the same random pattern
         return b
     }
 
@@ -571,29 +579,41 @@ final class BlurAnnotation: Annotation {
         let minSide = min(r.width, r.height)
         let region = CIImage(cgImage: base).cropped(to: r).clampedToExtent()
 
-        let filter: CIFilter?
+        var outImage: CIImage?
         switch style {
         case .pixelate:
-            // Blocks scale with the region's short side so text becomes
-            // genuinely unreadable (a whole character collapses into ~1 block).
-            let scale = max(24, minSide * (0.55 + amount * 0.45))
-            filter = CIFilter(name: "CIPixellate", parameters: [
-                kCIInputImageKey: region,
-                kCIInputScaleKey: scale,
-                kCIInputCenterKey: CIVector(x: r.midX, y: r.midY),
-            ])
+            // Text redaction: blocks are ~a third of the region's short side, so
+            // dark glyph strokes survive as chunky blocks (you can tell text WAS
+            // there) but each character is garbled beyond reading.
+            let scale = max(6, minSide * (0.22 + amount * 0.16))
+            let center = CIVector(x: r.midX, y: r.midY)
+            let pix = region.applyingFilter("CIPixellate", parameters: [
+                kCIInputScaleKey: scale, kCIInputCenterKey: center])
+
+            // Per-block random noise, so the mosaic looks randomly corrupted
+            // rather than a clean grid (also makes it unrecoverable).
+            var noise = CIFilter(name: "CIRandomGenerator")!.outputImage!
+                .transformed(by: CGAffineTransform(translationX: seedX, y: seedY))
+            // greyscale, remapped to ~[0.55, 1.0] so multiply darkens each block
+            // by a random amount.
+            noise = noise.applyingFilter("CIColorControls", parameters: [
+                kCIInputSaturationKey: 0.0, kCIInputContrastKey: 0.45, kCIInputBrightnessKey: 0.3])
+            noise = noise.applyingFilter("CIPixellate", parameters: [
+                kCIInputScaleKey: scale, kCIInputCenterKey: center])
+            outImage = pix.applyingFilter("CIMultiplyBlendMode", parameters: [
+                kCIInputBackgroundImageKey: pix.cropped(to: r),
+                kCIInputImageKey: noise.cropped(to: r)])
+
         case .blur:
             // Very heavy gaussian — radius near the region height smears glyphs.
             let radius = max(14, minSide * (0.5 + amount * 0.6))
-            filter = CIFilter(name: "CIGaussianBlur", parameters: [
-                kCIInputImageKey: region,
-                kCIInputRadiusKey: radius,
-            ])
+            outImage = region.applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius])
+
         case .solid:
-            filter = nil
+            outImage = nil
         }
 
-        guard let out = filter?.outputImage?.cropped(to: r),
+        guard let out = outImage?.cropped(to: r),
               let cg = BlurAnnotation.ciContext.createCGImage(out, from: r) else {
             fillSolid(r); return
         }

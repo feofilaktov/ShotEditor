@@ -154,6 +154,19 @@ final class IconSegmentedBar: NSView {
     }
 }
 
+/// Keeps a smaller-than-viewport document centered instead of pinned to the
+/// bottom-left corner (which leaves an ugly empty area on the right/top).
+final class CenteringClipView: NSClipView {
+    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+        var rect = super.constrainBoundsRect(proposedBounds)
+        guard let doc = documentView else { return rect }
+        let d = doc.frame.size
+        if d.width < rect.width { rect.origin.x = (d.width - rect.width) / 2 }
+        if d.height < rect.height { rect.origin.y = (d.height - rect.height) / 2 }
+        return rect
+    }
+}
+
 /// Text-button factory helpers.
 enum Buttons {
     static func primary(_ title: String, target: Any?, action: Selector, key: String = "") -> NSButton {

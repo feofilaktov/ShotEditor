@@ -55,70 +55,169 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// A clean, realistic scene to judge real-world quality of each tool.
+    /// A polished, fully-fake invoice annotated with every tool — used as the
+    /// README hero image. Contains no real data.
     static func runShowcase() {
-        let W = 1000, H = 620
-        let base = NSImage(size: CGSize(width: W, height: H))
-        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: W, pixelsHigh: H,
+        let W: CGFloat = 1600, H: CGFloat = 1120
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(W), pixelsHigh: Int(H),
                                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
                                    isPlanar: false, colorSpaceName: .deviceRGB,
                                    bytesPerRow: 0, bitsPerPixel: 0)!
         rep.size = CGSize(width: W, height: H)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)!
-        NSColor(calibratedWhite: 0.99, alpha: 1).setFill()
-        NSRect(x: 0, y: 0, width: W, height: H).fill()
-        // A faux "document" with lines of text (y is bottom-up).
-        let lines = ["Invoice #2026-0042", "Account: 4916 2534 8871 0090",
-                     "Name: Jane Appleseed", "Total due: $1,240.00", "Status: PAID"]
-        for (i, line) in lines.enumerated() {
+
+        let ink = NSColor(calibratedWhite: 0.13, alpha: 1)
+        let muted = NSColor(calibratedWhite: 0.45, alpha: 1)
+        var R: [String: CGRect] = [:]
+
+        // Draw a text line; topPx is distance from the top edge. Records rect.
+        @discardableResult
+        func T(_ key: String?, _ str: String, x: CGFloat, topPx: CGFloat, size: CGFloat,
+               weight: NSFont.Weight = .regular, color: NSColor = ink, rightX: CGFloat? = nil) -> CGRect {
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 30, weight: i == 0 ? .bold : .regular),
-                .foregroundColor: NSColor(calibratedWhite: 0.15, alpha: 1)]
-            (line as NSString).draw(at: CGPoint(x: 60, y: H - 90 - i * 60), withAttributes: attrs)
+                .font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color]
+            let sz = (str as NSString).size(withAttributes: attrs)
+            let ox = rightX != nil ? rightX! - sz.width : x
+            let y = H - topPx - sz.height
+            (str as NSString).draw(at: CGPoint(x: ox, y: y), withAttributes: attrs)
+            let r = CGRect(x: ox, y: y, width: sz.width, height: sz.height)
+            if let key { R[key] = r }
+            return r
         }
+
+        NSColor.white.setFill(); NSRect(x: 0, y: 0, width: W, height: H).fill()
+
+        // Header
+        T(nil, "VOLTA ENERGY", x: 100, topPx: 70, size: 46, weight: .bold, color: NSColor(calibratedWhite: 0.32, alpha: 1))
+        T(nil, "Invoice", x: 0, topPx: 66, size: 48, weight: .bold, color: ink, rightX: W - 100)
+        NSColor(calibratedWhite: 0.32, alpha: 1).setFill()
+        NSBezierPath(rect: CGRect(x: 100, y: H - 150, width: 360, height: 5)).fill()   // brand underline
+
+        // Seller block
+        T(nil, "Volta Energy Inc.", x: 100, topPx: 210, size: 30, weight: .bold)
+        T("addr", "1200 Battery Way", x: 100, topPx: 262, size: 22, color: muted)
+        T(nil, "94040 Mountain View CA, US", x: 100, topPx: 300, size: 22, color: muted)
+        T(nil, "Tax ID: US 88-1234567", x: 100, topPx: 338, size: 22, color: muted)
+        T(nil, "www.volta.example", x: 100, topPx: 376, size: 22, color: muted)
+
+        // Invoice detail (right)
+        let labelX: CGFloat = 980, valRight = W - 100
+        T(nil, "Invoice Number", x: labelX, topPx: 210, size: 22, color: muted)
+        T("invNo", "INV-2026-0042", x: 0, topPx: 210, size: 22, rightX: valRight)
+        T(nil, "Invoice date", x: labelX, topPx: 250, size: 22, color: muted)
+        T("date2", "2026/05/09", x: 0, topPx: 250, size: 22, rightX: valRight)
+        T(nil, "Reference Number", x: labelX, topPx: 290, size: 22, color: muted)
+        T(nil, "REF-99341", x: 0, topPx: 290, size: 22, rightX: valRight)
+        T(nil, "Customer Number", x: labelX, topPx: 330, size: 22, color: muted)
+        T(nil, "CUST-55210", x: 0, topPx: 330, size: 22, rightX: valRight)
+
+        // Bill To / location
+        T(nil, "Bill To", x: 100, topPx: 470, size: 30, weight: .bold)
+        T(nil, "Charging Location", x: 980, topPx: 470, size: 30, weight: .bold)
+        T("name", "Alex Morgan", x: 100, topPx: 540, size: 26)
+        T("card", "Card: 4916 2534 8871 0090", x: 100, topPx: 585, size: 24, color: muted)
+        T(nil, "billing@example.com", x: 100, topPx: 623, size: 24, color: muted)
+        T("loc", "Station EV-77, Lot B", x: 980, topPx: 540, size: 24)
+        T(nil, "Palo Alto, CA", x: 980, topPx: 578, size: 24, color: muted)
+
+        T("vin", "Vehicle ID: 5YJ3E1EA7KF000000", x: 100, topPx: 710, size: 26, weight: .semibold, color: NSColor(calibratedWhite: 0.3, alpha: 1))
+
+        // Table
+        NSColor(calibratedWhite: 0.30, alpha: 1).setFill()
+        NSBezierPath(rect: CGRect(x: 100, y: H - 830, width: W - 200, height: 46)).fill()
+        let cols: [(String, CGFloat)] = [("Date of Event", 118), ("Description", 360),
+            ("Unit Price (USD)", 780), ("Quantity", 1040), ("Tax (%)", 1250), ("Total (USD)", 1400)]
+        for (t, x) in cols { T(nil, t, x: x, topPx: 793, size: 20, weight: .semibold, color: .white) }
+        T("date", "2026/05/09", x: 118, topPx: 855, size: 22)
+        T(nil, "Energy fee", x: 360, topPx: 855, size: 22)
+        T(nil, "0.36 / kWh", x: 780, topPx: 855, size: 22)
+        T(nil, "46.6941 kWh", x: 1040, topPx: 855, size: 22)
+        T(nil, "8%", x: 1250, topPx: 855, size: 22)
+        T(nil, "$16.81", x: 0, topPx: 855, size: 22, rightX: W - 118)
+
+        // Totals
+        T(nil, "Subtotal", x: 1080, topPx: 940, size: 24, color: muted)
+        T(nil, "$16.81", x: 0, topPx: 940, size: 24, rightX: valRight)
+        T(nil, "Total Tax", x: 1080, topPx: 980, size: 24, color: muted)
+        T(nil, "$1.35", x: 0, topPx: 980, size: 24, rightX: valRight)
+        T(nil, "Total Amount (USD)", x: 1080, topPx: 1022, size: 26, weight: .bold)
+        T("total", "$18.16", x: 0, topPx: 1022, size: 26, weight: .bold, rightX: valRight)
+
         NSGraphicsContext.restoreGraphicsState()
-        base.addRepresentation(rep)
+        let base = NSImage(size: CGSize(width: W, height: H)); base.addRepresentation(rep)
 
+        // ---- Annotate with every tool ----
         let doc = EditorDocument(image: base)
-        let s = doc.imageSize
-        func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
-        func topY(_ py: CGFloat) -> CGFloat { s.height - py }   // convert screen-top y to image y
+        let red = Palette.swatches[0].color, yellow = Palette.swatches[1].color
+        let green = Palette.swatches[2].color, blue = Palette.swatches[3].color
+        let magenta = Palette.swatches[4].color
+        func pad(_ r: CGRect, _ dx: CGFloat, _ dy: CGFloat) -> CGRect { r.insetBy(dx: -dx, dy: -dy) }
 
-        // Redact the account number (pixelate) and cover the total with solid.
-        let acct = BlurAnnotation(rect: CGRect(x: 205, y: topY(175), width: 360, height: 40), style: .pixelate)
-        acct.amount = 0.85; doc.add(acct)
+        // 1) Redaction — pixelate the invoice number & VIN, solid bar over the card.
+        for key in ["invNo", "vin"] where R[key] != nil {
+            let b = BlurAnnotation(rect: pad(R[key]!, 6, 6), style: .pixelate); b.amount = 0.85
+            doc.add(b)
+        }
+        let solid = BlurAnnotation(rect: pad(R["card"]!, 6, 4), style: .solid); doc.add(solid)
 
-        // Highlight the "PAID" status line.
-        let hl = PenAnnotation(points: (0...20).map { P(60 + CGFloat($0) * 6, topY(365)) })
-        hl.isHighlighter = true; hl.color = Palette.swatches[1].color; hl.lineWidth = 34
-        doc.add(hl)
-
-        // Arrow pointing at the total.
-        let arrow = ArrowAnnotation(start: P(720, topY(360)), end: P(360, topY(305)), style: .filled)
-        arrow.color = Palette.swatches[0].color; arrow.lineWidth = 6
-        doc.add(arrow)
-
-        // Numbered steps down the right side.
-        for (i, py) in [90, 150, 210].enumerated() {
-            let n = NumberAnnotation(center: P(900, topY(CGFloat(py))), number: i + 1, diameter: 44)
-            n.color = Palette.swatches[3].color; doc.add(n)
+        // 2) Numbered markers + red arrows on four key fields.
+        for (i, key) in ["addr", "name", "loc", "date"].enumerated() {
+            guard let r = R[key] else { continue }
+            let badge = CGPoint(x: r.minX - 46, y: r.midY)
+            let n = NumberAnnotation(center: badge, number: i + 1, diameter: 42); n.color = blue
+            doc.add(n)
+            let a = ArrowAnnotation(start: CGPoint(x: badge.x - 150, y: badge.y - 95),
+                                    end: CGPoint(x: badge.x - 26, y: badge.y - 12), style: .filled)
+            a.color = red; a.lineWidth = 7; doc.add(a)
         }
 
-        // A rounded-rect emphasis around the name.
-        let box = ShapeAnnotation(kind: .roundedRect, p0: P(50, topY(300)), p1: P(430, topY(245)))
-        box.color = Palette.swatches[2].color; box.lineWidth = 4; doc.add(box)
+        // 3) Highlighter over the total amount.
+        if let t = R["total"] {
+            let hl = PenAnnotation(points: [CGPoint(x: t.minX - 6, y: t.midY), CGPoint(x: t.maxX + 6, y: t.midY)])
+            hl.isHighlighter = true; hl.color = yellow; hl.lineWidth = t.height + 16
+            doc.add(hl)
+        }
 
-        // Callout.
-        let callout = CalloutAnnotation(rect: CGRect(x: 560, y: topY(560), width: 320, height: 90),
-                                        tailTip: P(470, topY(500)), font: .systemFont(ofSize: 26, weight: .semibold))
-        callout.color = Palette.swatches[4].color; callout.string = "Please verify this total"
-        doc.add(callout)
+        // 4) Pen squiggle under the brand (like a signature).
+        let squiggle = PenAnnotation(points: (0...40).map {
+            CGPoint(x: 100 + CGFloat($0) * 9, y: H - 168 + sin(CGFloat($0) / 2.2) * 9)
+        })
+        squiggle.color = red; squiggle.lineWidth = 5; doc.add(squiggle)
 
+        // 5) Rounded-rect emphasis around the Bill To block.
+        if let n = R["name"], let c = R["card"] {
+            let box = ShapeAnnotation(kind: .roundedRect,
+                                      p0: CGPoint(x: 80, y: c.minY - 12),
+                                      p1: CGPoint(x: 620, y: n.maxY + 12))
+            box.color = green; box.lineWidth = 4; doc.add(box)
+        }
+
+        // 6) Dashed rect around the line item.
+        let dash = ShapeAnnotation(kind: .rect, p0: CGPoint(x: 105, y: H - 878),
+                                   p1: CGPoint(x: W - 105, y: H - 828))
+        dash.color = red; dash.lineWidth = 4; dash.dashed = true; doc.add(dash)
+
+        // 7) Callout near the total.
+        if let t = R["total"] {
+            let callout = CalloutAnnotation(rect: CGRect(x: 700, y: t.midY - 55, width: 300, height: 96),
+                                            tailTip: CGPoint(x: t.minX - 20, y: t.midY),
+                                            font: .systemFont(ofSize: 26, weight: .semibold))
+            callout.color = magenta; callout.string = "Verify this total"; doc.add(callout)
+        }
+
+        // 8) Text note (placed in the empty area under Charging Location).
+        if let loc = R["loc"] {
+            let note = TextAnnotation(origin: CGPoint(x: loc.minX, y: loc.minY - 40),
+                                      string: "Note: due in 30 days", font: .systemFont(ofSize: 22, weight: .semibold))
+            note.color = green; doc.add(note)
+        }
+
+        // Beautify backdrop.
         doc.backdrop.enabled = true
-        doc.backdrop.style = .oceanGradient
-        doc.backdrop.padding = 70
-        doc.backdrop.cornerRadius = 18
+        doc.backdrop.style = .sunsetGradient
+        doc.backdrop.padding = 90
+        doc.backdrop.cornerRadius = 24
 
         if let data = ImageExport.data(from: Renderer.flattenForExport(doc), format: .png) {
             try? data.write(to: URL(fileURLWithPath: "/tmp/shotedit_verify/showcase.png"))
@@ -231,8 +330,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let req = VNRecognizeTextRequest()
             req.recognitionLevel = .accurate
             try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([req])
-            let lines = (req.results as? [VNRecognizedTextObservation])?
-                .compactMap { $0.topCandidates(1).first?.string } ?? []
+            let lines = (req.results ?? [])
+                .compactMap { $0.topCandidates(1).first?.string }
             NSLog("OCR result: \(lines)")
         }
 

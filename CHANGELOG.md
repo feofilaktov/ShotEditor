@@ -5,7 +5,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+- Pixelate redaction now looks like a corrupted mosaic: block size scales to
+  the region so text stays visible-as-blocks but unreadable, with per-object
+  random noise so it's not a clean grid.
+- The editor window sizes to the image and centers it (no large empty margin).
+
+### Added
+- Editing an already-placed object: changing color/size/style/font/effect in the
+  inspector now updates the selected object (with undo), no need to redraw it.
 
 ## [0.1.0] — 2026-08-02
 
