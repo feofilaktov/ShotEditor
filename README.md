@@ -32,8 +32,17 @@ Annotate, redact, and beautify — then save, copy, or drag out:
 
 1. Download `ShotEditor.dmg` from the [latest release](../../releases/latest).
 2. Open the `.dmg` and drag **ShotEditor** into **Applications**.
-3. First launch: **right-click** ShotEditor → **Open** → **Open**
-   (the build is not notarized, so macOS asks once).
+3. The build isn't notarized, so macOS Gatekeeper blocks it the first time
+   (*"Apple could not verify ShotEditor is free of malware"*). Allow it with
+   **either**:
+   - Terminal (quickest):
+     ```sh
+     xattr -dr com.apple.quarantine /Applications/ShotEditor.app
+     ```
+   - or System Settings → **Privacy & Security** → scroll down →
+     **Open Anyway** (after the first blocked attempt).
+
+   On older macOS you can instead right-click the app → **Open** → **Open**.
 4. Trigger a capture and grant **Screen Recording** in
    System Settings → Privacy & Security → Screen Recording, then reopen the app.
 
